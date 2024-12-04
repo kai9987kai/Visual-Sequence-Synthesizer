@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Visual Sequence Synthesizer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Styles remain the same as in the previous example */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Visual Sequence Synthesizer</h1>
+        
+        <input 
+            type="text" 
+            id="textPrompt" 
+            placeholder="Enter a creative prompt" 
+            aria-label="Image generation prompt"
+        >
+        
+        <button 
+            id="generateBtn" 
+            aria-label="Generate Visual Sequence"
+        >
+            Synthesize Sequence
+        </button>
+        
+        <div 
+            id="loading" 
+            aria-live="polite"
+        >
+            Generating visual sequence...
+        </div>
+        
+        <div 
+            id="styleInfo" 
+            aria-live="polite"
+        >
+            Style: Awaiting prompt...
+        </div>
+        
+        <div 
+            id="output" 
+            aria-label="Generated visual sequence output"
+        >
+            <canvas id="outputCanvas"></canvas>
+        </div>
+        
+        <!-- Download Options -->
+        <div>
+            <button id="downloadBtn">Download Sequence</button>
+            <button id="downloadGifBtn">Download as GIF</button>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const generateBtn = document.getElementById('generateBtn');
+        const textPrompt = document.getElementById('textPrompt');
+        const loadingIndicator = document.getElementById('loading');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const outputDiv = document.getElementById('output');
+        const styleInfoDiv = document.getElementById('styleInfo');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadGifBtn = document.getElementById('downloadGifBtn');
+
+        // Enhanced keyword mappings with synonyms and weights
+        const keywordMappings = {
+            'nature': { synonyms: ['meadow', 'forest'], style: { shape: 'organic', color: 'green', animation: 'grow', weight: 1 } },
+            'sun': { synonyms: ['sunny', 'day'], style: { shape: 'circle', color: 'yellow', animation: 'expand', weight: 2 } },
+            'abstract': { synonyms: ['modern', 'art'], style: { shape: 'geometric', color: 'random', animation: 'rotate', weight: 1 } },
+            'galaxy': { synonyms: ['space', 'universe'], style: { shape: 'spiral', color: 'cosmic', animation: 'swirl', weight: 2 } },
+            'ocean': { synonyms: ['sea', 'water'], style: { shape: 'wave', color: 'blue', animation: 'flow', weight: 1 } }
+        };
+
+        // Function to analyze prompt and determine dominant style
+        function analyzePrompt(prompt) {
+            const words = prompt.toLowerCase().split(' ');
+            let styleScores = {};
+            Object.keys(keywordMappings).forEach(keyword => {
+                const synonyms = [keyword, ...keywordMappings[keyword].synonyms];
+                const weight = keywordMappings[keyword].style.weight;
+                synonyms.forEach(syn => {
+                    if (words.includes(syn)) {
+                        if (!styleScores[keyword]) styleScores[keyword] = 0;
+                        styleScores[keyword] += weight;
+                    }
+                });
+            });
+            if (Object.keys(styleScores).length === 0) return null;
+            const dominantStyle = Object.keys(styleScores).reduce((a, b) => styleScores[a] > styleScores[b] ? a : b);
+            return keywordMappings[dominantStyle].style;
+        }
+
+        generateBtn.addEventListener('click', async () => {
+            const prompt = textPrompt.value.trim();
+            
+            // Input validation
+            if (!prompt) {
+                alert('Please enter a creative prompt');
+                return;
+            }
+
+            try {
+                // Disable button during generation
+                generateBtn.disabled = true;
+                loadingIndicator.style.display = 'block';
+                outputDiv.innerHTML = '<canvas id="outputCanvas"></canvas>';
+                const canvas = document.getElementById('outputCanvas');
+
+                // Determine dominant style based on prompt
+                const style = analyzePrompt(prompt) || { shape: 'default', color: 'default', animation: 'default' };
+
+                // Update style info
+                styleInfoDiv.textContent = `Style: ${style.shape} - ${style.color} - ${style.animation}`;
+
+                // Generate image sequence
+                const frames = await generateImageSequence(prompt, 10, style);
+                
+                // Animate frames
+                animateFrames(frames, canvas);
+            } catch (error) {
+                console.error('Sequence Generation Error:', error);
+                outputDiv.innerHTML = `<p>Error generating sequence: ${error.message}</p>`;
+            } finally {
+                // Re-enable button and hide loading
+                generateBtn.disabled = false;
+                loadingIndicator.style.display = 'none';
+            }
+        });
+
+        // Function to generate image sequence
+        function generateImageSequence(prompt, numFrames, style) {
+            return new Promise((resolve) => {
+                const frames = [];
+                const colorHash = prompt.split('').reduce((hash, char) => hash + char.charCodeAt(0), 0);
+
+                for (let i = 0; i < numFrames; i++) {
+                    const frame = {
+                        width: 400,
+                        height: 400,
+                        draw: (ctx) => {
+                            // Color generation based on style
+                            let r, g, b;
+                            if (style.color === 'random') {
+                                r = Math.random() * 255;
+                                g = Math.random() * 255;
+                                b = Math.random() * 255;
+                            } else if (style.color === 'green') {
+                                r = 0;
+                                g = 128 + Math.sin(i) * 50;
+                                b = 0;
+                            } else if (style.color === 'yellow') {
+                                r = 255;
+                                g = 255;
+                                b = Math.sin(i) * 50;
+                            } else if (style.color === 'blue') {
+                                r = 0;
+                                g = 100;
+                                b = 200 + Math.sin(i) * 55;
+                            } else if (style.color === 'cosmic') {
+                                r = Math.abs(Math.sin(colorHash + i * 0.5) * 100);
+                                g = Math.abs(Math.cos(colorHash + i * 0.5) * 100);
+                                b = Math.abs(Math.tan(colorHash + i * 0.5) * 100) + 100;
+                            } else {
+                                r = Math.abs(Math.sin(colorHash + i) * 256) % 256;
+                                g = Math.abs(Math.cos(colorHash + i) * 256) % 256;
+                                b = Math.abs(Math.tan(colorHash + i) * 256) % 256;
+                            }
+
+                            // Background
+                            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                            ctx.fillRect(0, 0, 400, 400);
+
+                            // Shape generation based on style
+                            function drawShape(ctx) {
+                                // Shape drawing logic based on style.shape
+                                // ...
+                            }
+
+                            // Animation based on style.animation
+                            // ...
+
+                            // Text overlay
+                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                            ctx.font = '20px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(prompt.slice(0, 15), 200, 380);
+                        }
+                    };
+                    frames.push(frame);
+                }
+                resolve(frames);
+            });
+        }
+
+        // Function to animate frames
+        function animateFrames(frames, canvas) {
+            canvas.width = frames[0].width;
+            canvas.height = frames[0].height;
+            const ctx = canvas.getContext('2d');
+            let currentFrame = 0;
+
+            function drawFrame() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                frames[currentFrame].draw(ctx);
+                currentFrame = (currentFrame + 1) % frames.length;
+                requestAnimationFrame(drawFrame);
+            }
+
+            // Initial draw
+            drawFrame();
+
+            // Create download functionality
+            downloadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Code to download frames
+            });
+
+            downloadGifBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Code to download as GIF
+            });
+        }
+    });
+    </script>
+</body>
+</html>
